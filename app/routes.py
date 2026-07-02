@@ -31,7 +31,15 @@ async def chat(
     """
 
     # Get retriever instance created during FastAPI startup
+    
+    from app.retriever import Retriever
+    if request.app.state.retriever is None:
+         print("Loading retriever...")
+         request.app.state.retriever = Retriever()
+         print("Retriever loaded.")
+        
     retriever = request.app.state.retriever
+
 
     # Build conversation state from all messages
     state = manager.build_state(body.messages)
