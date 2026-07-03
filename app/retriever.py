@@ -14,20 +14,13 @@ class Retriever:
 
         
         # TEMPORARY: Disable model loading
-        self.model = SentenceTransformer(
-            "all-MiniLM-L6-v2"
-        )
+        self.model = SentenceTransformer("all-MiniLM-L6-v2")
 
         print("Loading FAISS index...")
 
-        self.index = faiss.read_index(
-            "vector_db/shl.index"
-        )
+        self.index = faiss.read_index("vector_db/shl.index")
 
-        with open(
-            "vector_db/data.pkl",
-            "rb"
-        ) as f:
+        with open("vector_db/data.pkl","rb") as f:
 
             self.df = pickle.load(f)
 
