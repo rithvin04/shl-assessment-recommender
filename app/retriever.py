@@ -10,13 +10,15 @@ from app.query_analyzer import analyze_query
 class Retriever:
 
     def __init__(self):
+        import os
 
-        print("Loading embedding model...")
-
+        print("Step A")
+        # TEMPORARY: Disable model loading
         self.model = SentenceTransformer(
             "all-MiniLM-L6-v2"
         )
 
+        print("STEP B")
         print("Loading FAISS index...")
 
         self.index = faiss.read_index(
@@ -72,11 +74,13 @@ class Retriever:
                 keyword_matches.append(idx)
 
         # --- Semantic search ---
+       
+        # TEMPORARY: Disable model encoding
+        
         query_embedding = self.model.encode(
             [query],
             convert_to_numpy=True
-        ).astype(np.float32)
-
+        ).astype(np.float32)        
         distances, indices = self.index.search(
             query_embedding,
             min(50, len(self.df))
@@ -85,7 +89,7 @@ class Retriever:
         semantic_matches = [
             idx for idx in indices[0]
             if idx in candidate_indices and idx not in keyword_matches
-        ]
+     ]
 
         final_indices = keyword_matches + semantic_matches
         final_indices = final_indices[:top_k]
