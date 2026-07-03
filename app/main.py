@@ -7,11 +7,7 @@ app = FastAPI(
     title="SHL Assessment Recommendation API v2"
 )
 
-@app.on_event("startup")
-async def startup_event():
-    print("Loading Retriever...")
-    app.state.retriever = Retriever()
-    print("Retriever Loaded Successfully.")
+app.state.retriever = None
 
 app.include_router(router)
 

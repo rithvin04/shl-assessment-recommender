@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Request
-
+from app.retriever import Retriever
+from app.conversation import ConversationManager
 from app.models import (
     ChatRequest,
     ChatResponse,
     Recommendation
 )
 
-from app.conversation import ConversationManager
+
 from app.chatbot import (
     generate_recommendation,
     generate_comparison,
@@ -36,7 +37,7 @@ async def chat(
 
     # Get retriever instance created during FastAPI startup
     
-    from app.retriever import Retriever
+    
     if request.app.state.retriever is None:
          print("Loading retriever...")
          request.app.state.retriever = Retriever()
