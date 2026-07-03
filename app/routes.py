@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Request
-from app.retriever import Retriever
 from app.conversation import ConversationManager
 from app.models import (
     ChatRequest,
@@ -39,6 +38,7 @@ async def chat(
     
     
     if request.app.state.retriever is None:
+         from app.retriever import Retriever
          print("Loading retriever...")
          request.app.state.retriever = Retriever()
          print("Retriever loaded.")
