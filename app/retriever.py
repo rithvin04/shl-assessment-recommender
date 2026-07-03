@@ -156,8 +156,8 @@ class Retriever:
                 "categories": categories
             })
 
-            return {
-                "requested": assessment_names,
+        return {
+            "requested": assessment_names,
 
-                "results": results
-            }
+            "results": results
+        }
