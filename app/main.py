@@ -4,7 +4,7 @@ from app.routes import router
 from app.retriever import Retriever
 
 app = FastAPI(
-    title="SHL Assessment Recommendation API"
+    title="SHL Assessment Recommendation API v2"
 )
 
 @app.on_event("startup")
