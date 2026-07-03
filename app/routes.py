@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Request
-import traceback
 
 from app.models import (
     ChatRequest,
@@ -8,10 +7,12 @@ from app.models import (
 )
 
 from app.conversation import ConversationManager
-from app.chatbot import generate_response
+from app.chatbot import (
+    generate_recommendation,
+    generate_comparison,
+    generate_refusal
+)
 from app.query_analyzer import analyze_query
-from app.retriever import Retriever
-
 router = APIRouter()
 
 manager = ConversationManager()
@@ -33,164 +34,138 @@ async def chat(
     SHL Assessment Chatbot Endpoint
     """
 
-    try:
-        # Lazy load retriever
-        if request.app.state.retriever is None:
-            print("Loading retriever...")
-            try:
-                request.app.state.retriever = Retriever()
-                print("Retriever loaded.")
-            except Exception:
-                print("Retriever failed!")
-                traceback.print_exc()
-                raise
+    # Get retriever instance created during FastAPI startup
+    
+    from app.retriever import Retriever
+    if request.app.state.retriever is None:
+         print("Loading retriever...")
+         request.app.state.retriever = Retriever()
+         print("Retriever loaded.")
+        
+    retriever = request.app.state.retriever
 
-        retriever = request.app.state.retriever
 
-        # Build conversation state
-        state = manager.build_state(body.messages)
+    # Build conversation state from all messages
+    state = manager.build_state(body.messages)
 
-        # Combined user query
-        user_query = state["raw_query"].strip()
-        latest_query = body.messages[-1].content
+    # Combined user query
+    user_query = state["raw_query"].strip()
+    latest_query = body.messages[-1].content
 
-        analysis = analyze_query(latest_query)
+    analysis = analyze_query(latest_query)
+    
 
-        # -----------------------------
-        # Compare Intent
-        # -----------------------------
-        if analysis["intent"] == "compare":
 
-            assessments = retriever.compare_assessments(
-                analysis["comparison"]
+   # -----------------------------
+# Compare Assessments
+# -----------------------------
+    if analysis["intent"] == "compare":
+        comparison = retriever.compare(
+            analysis["comparison"]
+       )
+
+        results = comparison["results"]
+
+        found = [r for r in results if r.get("found")]
+        missing = [r["name"] for r in results if not r.get("found")]
+
+        if len(found) != 2:
+            reply = ""
+
+            if found:
+                reply += f"Found: {found[0]['name']}\n\n"
+
+            if missing:
+                reply += f"Not Found: {', '.join(missing)}\n\n"
+
+            reply += (
+            "I can only compare assessments that exist in the SHL catalog."
             )
-
-            if len(assessments) < 2:
-                return ChatResponse(
-                    reply="I couldn't find both assessments to compare.",
-                    recommendations=[],
-                    end_of_conversation=True
-                )
-
-            first = assessments[0]
-            second = assessments[1]
-
-            reply = f"""
-Comparison of {first['name']} and {second['name']}
-
-Test Type:
-• {first['name']}: {first['categories']}
-• {second['name']}: {second['categories']}
-
-Duration:
-• {first['name']}: {first['duration']}
-• {second['name']}: {second['duration']}
-
-Remote:
-• {first['name']}: {first['remote']}
-• {second['name']}: {second['remote']}
-
-Adaptive:
-• {first['name']}: {first['adaptive']}
-• {second['name']}: {second['adaptive']}
-
-Description:
-
-• {first['name']}:
-{first['description']}
-
-• {second['name']}:
-{second['description']}
-"""
 
             return ChatResponse(
                 reply=reply,
                 recommendations=[],
                 end_of_conversation=True
-            )
+           )
 
-        # -----------------------------
-        # Refuse Off-topic Queries
-        # -----------------------------
-        if analysis["intent"] == "refuse":
+        first = found[0]
+        second = found[1]
 
-            return ChatResponse(
-                reply=(
-                    "I can only assist with SHL assessment recommendations, "
-                    "comparisons, and refinements. I can't help with unrelated "
-                    "questions, legal advice, or general hiring advice."
-                ),
-                recommendations=[],
-                end_of_conversation=True
-            )
-
-        # -----------------------------
-        # Clarification
-        # -----------------------------
-        clarification = manager.get_clarification_question(state)
-
-        if clarification:
-            return ChatResponse(
-                reply=clarification,
-                recommendations=[],
-                end_of_conversation=False
-            )
-
-        # -----------------------------
-        # Retrieve Assessments
-        # -----------------------------
-        results = retriever.search(
-            query=user_query,
-            top_k=5
+        reply = generate_comparison(
+            first,
+            second
         )
-
-        if len(results) == 0:
-
-            return ChatResponse(
-                reply="Sorry, I couldn't find a suitable SHL assessment for your requirements.",
-                recommendations=[],
-                end_of_conversation=True
-            )
-
-        # -----------------------------
-        # Generate Gemini Summary
-        # -----------------------------
-        reply = generate_response(
-            user_query=user_query,
-            assessments=results
-        )
-
-        # -----------------------------
-        # Build Recommendation List
-        # -----------------------------
-        recommendations = []
-
-        for assessment in results:
-
-            categories = assessment.get("categories", "")
-
-            if isinstance(categories, list):
-                test_type = ", ".join(categories)
-            else:
-                test_type = str(categories)
-
-            recommendations.append(
-                Recommendation(
-                    name=assessment["name"],
-                    url=assessment["url"],
-                    test_type=test_type
-                )
-            )
 
         return ChatResponse(
             reply=reply,
-            recommendations=recommendations,
+            recommendations=[],
+            end_of_conversation=True
+        )
+        
+    # -----------------------------
+    # Refuse Off-topic Queries
+    # -----------------------------
+    if analysis["intent"] == "refuse":
+        return ChatResponse(
+        reply=generate_refusal(),
+        recommendations=[],
+        end_of_conversation=True
+    )
+    
+    # Ask clarification question if required
+    clarification = manager.get_clarification_question(state)
+
+    if clarification:
+        return ChatResponse(
+            reply=clarification,
+            recommendations=[],
+            end_of_conversation=False
+        )
+    
+    # Retrieve top assessments
+    results = retriever.search(
+        query=user_query,
+        top_k=5
+    )
+   
+    # No results found
+    if len(results) == 0:
+
+        return ChatResponse(
+            reply="Sorry, I couldn't find a suitable SHL assessment for your requirements.",
+            recommendations=[],
             end_of_conversation=True
         )
 
-    except Exception:
-        print("=" * 80)
-        print("CHAT ENDPOINT FAILED")
-        traceback.print_exc()
-        print("=" * 80)
-        raise
+    # Generate Gemini response
+    reply = generate_recommendation(
+        user_query=user_query,
+        assessments=results
+    )
+
+    # Build recommendation list
+    recommendations = []
+
+    for assessment in results:
+
+        categories = assessment.get("categories", "")
+
+        if isinstance(categories, list):
+            test_type = ", ".join(categories)
+        else:
+            test_type = str(categories)
+
+        recommendations.append(
+            Recommendation(
+                name=assessment["name"],
+                url=assessment["url"],
+                test_type=test_type
+            )
+        )
+
+    return ChatResponse(
+        reply=reply,
+        recommendations=recommendations,
+        end_of_conversation=True
+    )
+  

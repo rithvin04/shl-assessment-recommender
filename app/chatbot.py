@@ -3,17 +3,14 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 
 load_dotenv()
-
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
 model = genai.GenerativeModel("gemini-2.5-flash")
-
-
-def generate_response(user_query, assessments):
+def build_catalog(assessments):
 
     catalog = ""
 
     for assessment in assessments:
+
         catalog += f"""
 Assessment Name: {assessment['name']}
 Description: {assessment['description']}
@@ -25,6 +22,15 @@ URL: {assessment['url']}
 
 """
 
+    return catalog
+
+
+def generate_recommendation(user_query, assessments):
+
+    catalog = ""
+
+    for assessment in assessments:
+        catalog = build_catalog(assessments)
     prompt = f"""
 You are an SHL Assessment Recommendation Assistant.
 
@@ -86,4 +92,50 @@ Recommendations:
     )
 
     return result
+
+
+def generate_comparison(first, second):
+
+    prompt = f"""
+You are an SHL Assessment Assistant.
+
+Compare ONLY these two SHL assessments.
+
+Assessment 1
+
+Name: {first['name']}
+Description: {first['description']}
+Duration: {first['duration']}
+Categories: {first['categories']}
+Remote: {first['remote']}
+
+Assessment 2
+
+Name: {second['name']}
+Description: {second['description']}
+Duration: {second['duration']}
+Categories: {second['categories']}
+Remote: {second['remote']}
+
+Rules:
+- Compare only the information provided.
+- Do not invent any features.
+- Mention similarities and differences.
+- Finish with when each assessment is more suitable.
+"""
+
+    response = model.generate_content(prompt)
+
+    return response.text
+
+
+def generate_refusal():
+
+    return (
+        "I can only assist with SHL assessment recommendations, "
+        "assessment comparisons, and job-description based assessment selection."
+    )
+
+
+
 

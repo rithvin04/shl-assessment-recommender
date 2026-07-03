@@ -31,30 +31,6 @@ class Retriever:
             self.df = pickle.load(f)
 
         print(f"Loaded {len(self.df)} assessments.")
-        print(self.df.index.equals(pd.RangeIndex(len(self.df))))
-        print(
-            "OPQ:",
-            self.df[
-                self.df["name"].str.contains(
-                    "OPQ",
-                    case=False,
-                    na=False
-               )
-            ]["name"].tolist()
-    
-        )
-
-        print(
-            "GSA:",
-            self.df[
-                self.df["name"].str.contains(
-                    "GSA",
-                    case=False,
-                    na=False
-                )
-            ]["name"].tolist()
-      )
-
     def search(self, query, top_k=5):
 
         filters = analyze_query(query)
@@ -129,7 +105,7 @@ class Retriever:
             })
 
         return recommendations
-    def compare_assessments(self, assessment_names):
+    def compare(self, assessment_names):
 
         results = []
 
@@ -145,12 +121,12 @@ class Retriever:
                     na=False
                 )
             ]
-            print("Searching:", search_name)
-            print(match["name"].tolist())
-
-
-
+            
             if match.empty:
+                results.append({
+                    "name": name,
+                    "found": False,
+                })
                 continue
 
             row = match.iloc[0]
@@ -171,6 +147,7 @@ class Retriever:
 
             results.append({
                 "name": row["name"],
+                "found": True,
                 "description": description,
                 "url": row["link"],
                 "duration": row["duration_raw"],
@@ -179,4 +156,8 @@ class Retriever:
                 "categories": categories
             })
 
-        return results
+            return {
+                "requested": assessment_names,
+
+                "results": results
+            }
