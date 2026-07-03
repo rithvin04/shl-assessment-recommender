@@ -12,13 +12,12 @@ class Retriever:
     def __init__(self):
         import os
 
-        print("Step A")
+        
         # TEMPORARY: Disable model loading
         self.model = SentenceTransformer(
             "all-MiniLM-L6-v2"
         )
 
-        print("STEP B")
         print("Loading FAISS index...")
 
         self.index = faiss.read_index(
